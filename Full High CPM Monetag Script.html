@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monetag App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="//libtl.com/sdk.js" data-zone="9779011" data-sdk="show_9779011"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #fffafc;
+    }
+    nav {
+      display: flex;
+      justify-content: space-around;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background: #ff4081;
+      padding: 10px 0;
+      color: white;
+      font-weight: bold;
+      z-index: 10;
+    }
+    nav div {
+      cursor: pointer;
+    }
+    .section {
+      display: none;
+      padding: 20px;
+      text-align: center;
+    }
+    .section.active {
+      display: block;
+    }
+    .profile-pic img {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #ff4081;
+    }
+    .info-box {
+      font-size: 18px;
+      margin: 10px 0;
+    }
+    .btn {
+      padding: 14px 30px;
+      font-size: 18px;
+      background: linear-gradient(135deg, #ff6a88, #ff99ac);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      margin: 10px;
+      transition: all 0.3s ease;
+    }
+    .btn:hover {
+      opacity: 0.9;
+    }
+    .form input, .form select {
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    .circular-progress {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: conic-gradient(#4caf50 0% 0%, #eee 0% 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+      flex-direction: column;
+    }
+    .history-log {
+      max-height: 300px;
+      overflow-y: auto;
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 10px;
+      text-align: left;
+    }
+    .history-log div {
+      background: #fff;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .history-log p {
+      margin: 5px 0;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Home Section -->
+  <div id="home" class="section active">
+    <div class="profile-pic">
+      <img id="userPic" src="https://img.icons8.com/ios-filled/100/000000/user-male-circle.png" alt="Profile">
+    </div>
+    <h2 id="userName">👤 User Name</h2>
+    <div class="info-box">📺 Total Ads Watched: <span id="totalAds">0</span></div>
+    <div class="info-box">💰 Total Withdrawn: <span id="totalWithdraw">0</span> pts</div>
+    <div class="info-box">💼 Balance: <span id="userBalance">0</span> pts</div>
+
+    <!-- 🎬 Watch Ad button that goes to Earn section -->
+    <button id="watchAdHome" class="btn">🎬 Watch Ad</button>
+  </div>
+
+  <!-- Earn Section -->
+  <div id="earn" class="section">
+    <h3>🎁 Earn Points</h3>
+    <div class="circular-progress" id="progressCircle">
+      <span id="circlePercent">0%</span>
+    </div>
+    <p><strong>🔴 Watched today:</strong> <span id="todayWatched" style="color: red;">0</span> ads</p>
+    <p><strong>🟢 Remaining today:</strong> <span id="todayRemaining" style="color: green;">100</span> ads</p>
+    <div id="progressText">Ready to watch</div>
+    <button id="watchAd" class="btn">🎬 Watch Ad</button>
+  </div>
+
+  <!-- Withdraw Section -->
+  <div id="withdraw" class="section">
+    <h3>💵 Withdraw Request</h3>
+    <p>💼 Your Balance: <strong><span id="withdrawBalance">0</span> pts</strong></p>
+    <div class="form">
+      <select id="method">
+        <option value="Bkash">Bkash</option>
+        <option value="Nagad">Nagad</option>
+        <option value="Rocket">Rocket</option>
+      </select>
+      <input type="number" id="amount" placeholder="Enter amount (min 10 pts)">
+      <input type="text" id="number" placeholder="Enter your number">
+      <button id="submitWithdraw" class="btn">📤 Submit</button>
+    </div>
+  </div>
+
+  <!-- History Section -->
+  <div id="history" class="section">
+    <h3>📜 Withdraw History</h3>
+    <div class="history-log" id="withdrawLog">
+      <p>No withdraw history yet.</p>
+    </div>
+  </div>
+
+  <!-- Navigation Menu -->
+  <nav>
+    <div onclick="switchSection('home')">🏠 Home</div>
+    <div onclick="switchSection('earn')">🎯 Earn</div>
+    <div onclick="switchSection('withdraw')">💵 Withdraw</div>
+    <div onclick="switchSection('history')">📜 History</div>
+  </nav>
+
+  <!-- Script Section -->
+  <script>
+    Telegram.WebApp.ready();
+    const user = Telegram.WebApp.initDataUnsafe?.user;
+    const name = `${user?.first_name || 'Unknown'} ${user?.last_name || ''}`.trim();
+    document.getElementById("userName").textContent = `👤 ${name}`;
+
+    let points = parseInt(localStorage.getItem('watch_ad_points')) || 0;
+    let totalAds = parseInt(localStorage.getItem('watch_ad_total')) || 0;
+    let totalWithdraw = parseInt(localStorage.getItem('withdraw_total')) || 0;
+    let withdrawHistory = JSON.parse(localStorage.getItem('withdraw_history') || '[]');
+
+    const today = new Date().toISOString().split('T')[0];
+    let dailyData = JSON.parse(localStorage.getItem('daily_ad_data') || '{}');
+    if (dailyData.date !== today) {
+      dailyData = { date: today, views: 0 };
+    }
+
+    function updateDisplays() {
+      document.getElementById('totalAds').textContent = totalAds;
+      document.getElementById('totalWithdraw').textContent = totalWithdraw;
+      document.getElementById('userBalance').textContent = points;
+      document.getElementById('withdrawBalance').textContent = points;
+      document.getElementById('todayWatched').textContent = dailyData.views;
+      document.getElementById('todayRemaining').textContent = 100 - dailyData.views;
+
+      const percent = Math.min((dailyData.views / 100) * 100, 100);
+      document.getElementById('circlePercent').textContent = `${Math.round(percent)}%`;
+      document.getElementById('progressCircle').style.background = `conic-gradient(#4caf50 0% ${percent}%, #eee ${percent}% 100%)`;
+
+      let historyHTML = withdrawHistory.length
+        ? withdrawHistory.map(h => `
+            <div>
+              <p>📅 <strong>Date:</strong> ${h.date}</p>
+              <p>💰 <strong>Amount:</strong> ${h.amount} pts</p>
+              <p>📱 <strong>Method:</strong> ${h.method}</p>
+              <p>☎️ <strong>Number:</strong> ${h.number}</p>
+            </div>
+          `).join('')
+        : '<p>No withdraw history yet.</p>';
+      document.getElementById('withdrawLog').innerHTML = historyHTML;
+    }
+
+    updateDisplays();
+
+    // ✅ Home button redirects to Earn section
+    document.getElementById("watchAdHome").addEventListener("click", () => {
+      switchSection('earn');
+    });
+
+    // Earn page ad logic
+    document.getElementById('watchAd').addEventListener('click', () => {
+      if (!window.show_9779011) return alert("Ad not available right now. Try again later.");
+      if (dailyData.views >= 100) return alert("You've reached the daily limit of 100 ads.");
+
+      document.getElementById("progressText").textContent = "🎬 Showing Ad...";
+      show_9779011();
+
+      let adAborted = false;
+      window.addEventListener('blur', () => adAborted = true, { once: true });
+
+      setTimeout(() => {
+        if (adAborted) {
+          alert("❌ You skipped the ad. Please watch again.");
+          document.getElementById("progressText").textContent = "❌ Ad skipped.";
+          return;
+        }
+
+        let countdown = 15;
+        document.getElementById("progressText").textContent = `⏳ Please watch full ad (${countdown}s)`;
+        const interval = setInterval(() => {
+          if (adAborted) {
+            clearInterval(interval);
+            alert("❌ You skipped the ad. Please watch again.");
+            document.getElementById("progressText").textContent = "❌ Ad skipped.";
+            return;
+          }
+
+          countdown--;
+          if (countdown > 0) {
+            document.getElementById("progressText").textContent = `⏳ Please watch full ad (${countdown}s)`;
+          } else {
+            clearInterval(interval);
+            points++;
+            totalAds++;
+            dailyData.views++;
+            localStorage.setItem('watch_ad_points', points);
+            localStorage.setItem('watch_ad_total', totalAds);
+            localStorage.setItem('daily_ad_data', JSON.stringify(dailyData));
+            updateDisplays();
+            document.getElementById("progressText").textContent = "✅ Ad complete! 1 point added.";
+          }
+        }, 1000);
+      }, 2000);
+    });
+
+    // Withdraw Logic
+    document.getElementById('submitWithdraw').addEventListener('click', () => {
+      const btn = document.getElementById('submitWithdraw');
+      btn.disabled = true;
+      btn.textContent = "⏳ Sending...";
+
+      const m = document.getElementById('method').value;
+      const a = parseInt(document.getElementById('amount').value);
+      const n = document.getElementById('number').value.trim();
+      if (!n || isNaN(a) || a < 10 || a > points) {
+        alert("Invalid input or not enough points");
+        btn.disabled = false;
+        btn.textContent = "📤 Submit";
+        return;
+      }
+
+      const msg = `📤 Withdraw Request\n👤 ${name}\n💵 ${a} pts\n📱 ${m}\n📞 ${n}`;
+      fetch("https://api.telegram.org/bot7544208791:AAGAOcOoyNI-FoGpX_hcxP3rrOaHvQRCpYU/sendMessage", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ chat_id: "@payProfWoof", text: msg })
+      }).then(() => {
+        points -= a;
+        totalWithdraw += a;
+        withdrawHistory.unshift({ date: new Date().toLocaleString(), amount: a, method: m, number: n });
+        localStorage.setItem('watch_ad_points', points);
+        localStorage.setItem('withdraw_total', totalWithdraw);
+        localStorage.setItem('withdraw_history', JSON.stringify(withdrawHistory));
+        updateDisplays();
+        alert("✅ Withdraw request sent!");
+      }).catch(() => {
+        alert("❌ Failed to send request.");
+      }).finally(() => {
+        btn.disabled = false;
+        btn.textContent = "📤 Submit";
+      });
+    });
+
+    function switchSection(id) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+  </script>
+</body>
+</html>
